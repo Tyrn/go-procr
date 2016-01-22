@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -27,6 +28,12 @@ var (
 func SansExt(pth string) string {
 	dir, file := filepath.Split(pth)
 	return filepath.Join(dir, file[:len(file)-len(filepath.Ext(pth))])
+}
+
+// Returns True, if path has extension ext, case and leading dot insensitive
+func HasExtOf(pth, ext string) bool {
+	xt := strings.Trim(filepath.Ext(pth), ". ")
+	return strings.ToUpper(xt) == strings.ToUpper(strings.Trim(ext, ". "))
 }
 
 func main() {
