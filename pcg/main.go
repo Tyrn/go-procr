@@ -284,10 +284,24 @@ func DecorateFileName(cntw, i int, name string) string {
 	return ZeroPad(cntw, i) + "-" + name
 }
 
+func TraverseFlatDst(srcDir, dstRoot string, fcount *int, cntw int) {
+	dirs, files := ListDirGroom(srcDir)
+	for _, v := range dirs {
+		TraverseFlatDst(v, dstRoot, fcount, cntw)
+	}
+	for _, v := range files {
+		dst := filepath.Join(dstRoot, DecorateFileName(cntw, *fcount, BaseName(v)))
+		fmt.Printf("%d><%s**%s\n", *fcount, v, dst)
+		*fcount++
+	}
+}
+
 func main() {
 	ParseArgs()
 	dirs, files := ListDirGroom(*src_dir)
 	fmt.Printf("%v\n%v\n", dirs, files)
 	fmt.Printf("ZeroPad(4, 16): \"%s\"\n", ZeroPad(4, 16))
 	fmt.Printf("FileCount(): %d\n", FileCount(*src_dir, IsAudioFile))
+	cnt := 1
+	TraverseFlatDst(*src_dir, *dst_dir, &cnt, 3)
 }
