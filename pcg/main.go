@@ -124,11 +124,17 @@ func MakeInitials(name string) string {
 	}
 
 	pr, _ := regexp.Compile(`\s+`) // Split by any space.
+
+	// Split (already hyphenless) (sub)string by spaces
+	// and reduce every one of them to an uppercase first letter.
 	splitBySpace := func(nm string) []string {
 		spl := pr.Split(nm, -1)
 		var ini []string
 		for _, v := range spl {
-			ini = append(ini, strings.ToUpper(v[:1]))
+			if len(v) >= 1 {
+				// At least one character to handle.
+				ini = append(ini, strings.ToUpper(v[:1]))
+			}
 		}
 		return ini
 	}
@@ -136,7 +142,7 @@ func MakeInitials(name string) string {
 	spl := fr.Split(enm, -1)
 	var r []string
 	for _, v := range spl {
-		r = append(r, strings.Join(splitBySpace(v), sep))
+		r = append(r, strings.Join(splitBySpace(strings.TrimSpace(v)), sep))
 	}
 	return strings.Join(r, hyph) + trail
 }

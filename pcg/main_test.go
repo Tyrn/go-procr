@@ -47,6 +47,13 @@ func TestCmpStrNaturally(t *testing.T) {
 }
 
 func TestMakeInitials(t *testing.T) {
+	assert.Equal(t, ".", MakeInitials(" "), tsbe)
+	assert.Equal(t, "A.", MakeInitials("  Alma "), tsbe)
 	assert.Equal(t, "J.R.R.T.", MakeInitials("John ronald reuel Tolkien"), tsbe)
+	assert.Equal(t, "E.B.S.", MakeInitials("e. B. Sledge"), tsbe)
 	assert.Equal(t, "A.C-G.", MakeInitials("Apsley Cherry-Garrard"), tsbe)
+	assert.Equal(t, "W.S-C-G.", MakeInitials("Windsor Saxe-\tCoburg - Gotha"), tsbe)
+	assert.Equal(t, "E.K---R.", MakeInitials("Elisabeth Kubler-- - Ross"), tsbe)
+	assert.Equal(t, "F-S.A-B.L.", MakeInitials("Fitz-Simmons Ashton-Burke Leigh"), tsbe)
+	assert.Equal(t, "A.B.", MakeInitials("Arleigh\"31-knot\"Burke"), tsbe)
 }
