@@ -3,8 +3,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -38,6 +40,12 @@ func ParseArgs() {
 func SansExt(pth string) string {
 	dir, file := filepath.Split(pth)
 	return filepath.Join(dir, file[:len(file)-len(filepath.Ext(pth))])
+}
+
+// Returns base name (file name complete with extension)
+func BaseName(pth string) string {
+	_, file := filepath.Split(pth)
+	return file
 }
 
 // Returns True, if path has extension ext, case and leading dot insensitive
@@ -155,6 +163,115 @@ func MakeInitials(name string) string {
 	return strings.Join(r, hyph) + trail
 }
 
+// Returns true, if pth is a recognized audio file
+func IsAudioFile(pth string) bool {
+	rx := []string{".MP3", ".M4A", ".M4B", ".OGG", ".WMA", ".FLAC"}
+	for _, v := range rx {
+		if HasExtOf(pth, v) {
+			return true
+		}
+	}
+	return false
+}
+
+// Returns a list of directories in absPath directory, and a list of files filtered by fileCondition
+func CollectDirsAndFiles(absPath string, fileCondition func(string) bool) ([]string, []string) {
+	haul, _ := ioutil.ReadDir(absPath)
+	var dirs, files []string
+	for _, v := range haul {
+		if v.IsDir() {
+			dirs = append(dirs, filepath.Join(absPath, v.Name()))
+		} else {
+			if fileCondition(v.Name()) {
+				files = append(files, filepath.Join(absPath, v.Name()))
+			}
+		}
+	}
+	return dirs, files
+}
+
+// Compares two paths, ignoring extensions
+func ComparePath(xp, yp string) int {
+	x := SansExt(xp)
+	y := SansExt(yp)
+	if *sort_lex {
+		return strings.Compare(x, y)
+	}
+	return StrCmpNaturally(x, y)
+}
+
+// Compares two paths, filenames only, ignoring extensions
+func CompareFile(xf, yf string) int {
+	x := SansExt(BaseName(xf))
+	y := SansExt(BaseName(yf))
+	if *sort_lex {
+		return strings.Compare(x, y)
+	}
+	return StrCmpNaturally(x, y)
+}
+
+// Sorting interface implementation: natural, lexicographical, and
+// reverse order.
+
+type CustomDir []string
+
+func (s CustomDir) Len() int {
+	return len(s)
+}
+func (s CustomDir) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s CustomDir) Less(i, j int) bool {
+	if *reverse {
+		return ComparePath(s[i], s[j]) > 0
+	}
+	return ComparePath(s[i], s[j]) < 0
+}
+
+type CustomFile []string
+
+func (s CustomFile) Len() int {
+	return len(s)
+}
+func (s CustomFile) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s CustomFile) Less(i, j int) bool {
+	if *reverse {
+		return CompareFile(s[i], s[j]) > 0
+	}
+	return CompareFile(s[i], s[j]) < 0
+}
+
+// Returns (0) a naturally sorted list of
+// offspring directory paths (1) a naturally sorted list
+// of offspring file paths.
+func ListDirGroom(absPath string) ([]string, []string) {
+	dirs, files := CollectDirsAndFiles(absPath, IsAudioFile)
+	sort.Sort(CustomDir(dirs))
+	sort.Sort(CustomFile(files))
+	return dirs, files
+}
+
+func ZeroPad(w, i int) string {
+	fs := fmt.Sprintf("%%0%dd", w)
+	return fmt.Sprintf(fs, i)
+}
+
+func DecorateDirName(i int, name string) string {
+	return ZeroPad(3, i) + "-" + name
+}
+
+func DecorateFileName(cntw, i int, name string) string {
+	if len(*unified_name) > 0 {
+		return ZeroPad(cntw, i) + "-" + *unified_name + filepath.Ext(name)
+	}
+	return ZeroPad(cntw, i) + "-" + name
+}
+
 func main() {
 	ParseArgs()
+	dirs, files := ListDirGroom(*src_dir)
+	fmt.Printf("%v\n%v\n", dirs, files)
+	fmt.Printf("ZeroPad(4, 16): \"%s\"\n", ZeroPad(4, 16))
 }
