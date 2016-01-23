@@ -12,7 +12,6 @@ import (
 )
 
 var (
-	help         = kingpin.Flag("help", "Prints help").Short('h').Bool()
 	verbose      = kingpin.Flag("verbose", "Verbose output").Short('v').Bool()
 	file_title   = kingpin.Flag("file-title", "Use file name for title tag").Short('f').Bool()
 	sort_lex     = kingpin.Flag("sort-lex", "Sort files lexicographically").Short('x').Bool()
@@ -24,7 +23,16 @@ var (
 	album_num    = kingpin.Flag("album-num", "Album number").Short('b').String()
 	artist_tag   = kingpin.Flag("artist-tag", "\"Artist\" tag").Short('a').String()
 	album_tag    = kingpin.Flag("album-tag", "\"Album\" tag").Short('g').String()
+	src_dir      = kingpin.Arg("src", "Source directory").Required().String()
+	dst_dir      = kingpin.Arg("dst", "Destination directory").Required().String()
 )
+
+func ParseArgs() {
+	kingpin.CommandLine.HelpFlag.Short('h')
+	kingpin.Parse()
+
+	fmt.Printf("%s %s \"%s\"\n", strings.TrimRight(*src_dir, "/\\"), strings.TrimRight(*dst_dir, "/\\"), *album_num)
+}
 
 // Discards file extension
 func SansExt(pth string) string {
@@ -148,7 +156,5 @@ func MakeInitials(name string) string {
 }
 
 func main() {
-	kingpin.Parse()
-	sansExt := SansExt("/alfa/bravo/moo/charlie.flac")
-	fmt.Printf("%v, %s %s\n", *help, *file_type, sansExt)
+	ParseArgs()
 }
