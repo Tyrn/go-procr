@@ -190,6 +190,21 @@ func CollectDirsAndFiles(absPath string, fileCondition func(string) bool) ([]str
 	return dirs, files
 }
 
+// Returns a total number of files in the dirPath directory filtered by fileCondition
+func FileCount(dirPath string, fileCondition func(string) bool) int {
+	cnt := 0
+	dirs, files := CollectDirsAndFiles(dirPath, fileCondition)
+	for _, v := range dirs {
+		cnt += FileCount(v, fileCondition)
+	}
+	for _, v := range files {
+		if fileCondition(v) {
+			cnt++
+		}
+	}
+	return cnt
+}
+
 // Compares two paths, ignoring extensions
 func ComparePath(xp, yp string) int {
 	x := SansExt(xp)
@@ -211,7 +226,7 @@ func CompareFile(xf, yf string) int {
 }
 
 // Sorting interface implementation: natural, lexicographical, and
-// reverse order.
+// reverse order, according to command line options.
 
 type CustomDir []string
 
@@ -274,4 +289,5 @@ func main() {
 	dirs, files := ListDirGroom(*src_dir)
 	fmt.Printf("%v\n%v\n", dirs, files)
 	fmt.Printf("ZeroPad(4, 16): \"%s\"\n", ZeroPad(4, 16))
+	fmt.Printf("FileCount(): %d\n", FileCount(*src_dir, IsAudioFile))
 }
