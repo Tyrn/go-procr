@@ -31,11 +31,31 @@ var (
 	dst_dir      = kingpin.Arg("dst", "Destination directory").Required().String()
 )
 
+// Parses the command line and checks some conditions
 func ParseArgs() {
 	kingpin.CommandLine.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	fmt.Printf("%s %s \"%s\"\n", strings.TrimRight(*src_dir, "/\\"), strings.TrimRight(*dst_dir, "/\\"), *album_num)
+	if !IsDir(*src_dir) {
+		fmt.Printf("Source directory \"%s\" is not there.\n", *src_dir)
+		os.Exit(2)
+	}
+	if !IsDir(*dst_dir) {
+		fmt.Printf("Destination path \"%s\" is not there.\n", *dst_dir)
+		os.Exit(2)
+	}
+}
+
+// Return true, if directory
+func IsDir(pth string) bool {
+	finfo, err := os.Stat(pth)
+	if err != nil {
+		return false
+	}
+	if finfo.IsDir() {
+		return true
+	}
+	return false
 }
 
 // Discards file extension
@@ -286,16 +306,60 @@ func DecorateFileName(cntw, i int, name string) string {
 	return ZeroPad(cntw, i) + "-" + name
 }
 
-func TraverseFlatDst(srcDir, dstRoot string, fcount *int, cntw int) {
+// Recursively traverses the source directory and copies all the audio files to destination;
+// the destination directory and file names get decorated according to options.
+// All files go to a single destination directory
+func TraverseFlatDst(srcDir, dstRoot string, fcount *int, tot int) {
 	dirs, files := ListDirGroom(srcDir)
 	for _, v := range dirs {
-		TraverseFlatDst(v, dstRoot, fcount, cntw)
+		TraverseFlatDst(v, dstRoot, fcount, tot)
 	}
 	for _, v := range files {
-		dst := filepath.Join(dstRoot, DecorateFileName(cntw, *fcount, BaseName(v)))
-		CopySync(v, dst)
-		fmt.Printf("%d><%s**%s\n", *fcount, v, dst)
+		dst := filepath.Join(dstRoot, DecorateFileName(len(strconv.Itoa(tot)), *fcount, BaseName(v)))
+		CopyFile(*fcount, tot, v, dst)
 		*fcount++
+	}
+}
+
+// Recursively traverses the source directory and copies all the audio files to destination;
+// the destination directory and file names get decorated according to options.
+// The copy order is reverse;
+// All files go to a single destination directory
+func TraverseFlatDstReverse(srcDir, dstRoot string, fcount *int, tot int) {
+	dirs, files := ListDirGroom(srcDir)
+	for _, v := range files {
+		dst := filepath.Join(dstRoot, DecorateFileName(len(strconv.Itoa(tot)), *fcount, BaseName(v)))
+		CopyFile(*fcount, tot, v, dst)
+		*fcount--
+	}
+	for _, v := range dirs {
+		TraverseFlatDstReverse(v, dstRoot, fcount, tot)
+	}
+}
+
+// Recursively traverses the source directory and copies all the audio files to destination;
+// the destination directory and file names get decorated according to options
+func TraverseTreeDst(srcDir, dstRoot, dstStep string, fcount *int, tot int) {
+	dirs, files := ListDirGroom(srcDir)
+	for i, v := range dirs {
+		step := filepath.Join(dstStep, DecorateDirName(i, BaseName(v)))
+		os.Mkdir(filepath.Join(dstRoot, step), 0777)
+		TraverseTreeDst(v, dstRoot, step, fcount, tot)
+	}
+	for i, v := range files {
+		dstFile := filepath.Join(dstStep, DecorateFileName(len(strconv.Itoa(tot)), i, BaseName(v)))
+		CopyFile(*fcount, tot, v, filepath.Join(dstRoot, dstFile))
+		*fcount++
+	}
+}
+
+// Copy and process one audio file
+func CopyFile(i, tot int, src, dst string) {
+	CopySync(src, dst)
+	if *verbose {
+		fmt.Printf("%5d/%d %s\n", i, tot, dst)
+	} else {
+		fmt.Printf(".")
 	}
 }
 
@@ -324,12 +388,71 @@ func CopySync(src, dst string) (int64, error) {
 	return io.Copy(dst_file, src_file)
 }
 
+// Traverses the source tree according to options
+func Groom(src, dst string, tot int) {
+
+	if !*verbose {
+		fmt.Printf("Starting ")
+	}
+
+	if *tree_dst {
+		if *reverse {
+			fmt.Printf("Remove either -t or -r\n")
+			os.Exit(2)
+		} else {
+			c := 1
+			TraverseTreeDst(src, dst, "", &c, tot)
+		}
+	} else {
+		if *reverse {
+			c := tot
+			TraverseFlatDstReverse(src, dst, &c, tot)
+		} else {
+			c := 1
+			TraverseFlatDst(src, dst, &c, tot)
+		}
+	}
+
+	if !*verbose {
+		fmt.Printf(" Done (%d)\n", tot)
+	}
+}
+
+func BuildAlbum(src, dst string) {
+	srcName := BaseName(src)
+	prefix := ""
+	if len(*album_num) > 0 {
+		n, _ := strconv.Atoi(*album_num)
+		prefix = ZeroPad(2, n) + "-"
+	}
+	baseDst := srcName
+	if len(*unified_name) > 0 {
+		baseDst = prefix + *unified_name
+	}
+	ex := baseDst
+	if *drop_dst {
+		ex = ""
+	}
+
+	executiveDst := filepath.Join(dst, ex)
+	tot := FileCount(src, IsAudioFile)
+	if tot < 1 {
+		fmt.Printf("There are no supported audio files in the source directory \"%s\".\n", src)
+		os.Exit(2)
+	}
+
+	if !*drop_dst {
+		if IsDir(executiveDst) {
+			fmt.Printf("Destination directory \"%s\" already exists.\n", executiveDst)
+			os.Exit(2)
+		} else {
+			os.Mkdir(executiveDst, 0777)
+		}
+	}
+	Groom(src, executiveDst, tot)
+}
+
 func main() {
 	ParseArgs()
-	dirs, files := ListDirGroom(*src_dir)
-	fmt.Printf("%v\n%v\n", dirs, files)
-	fmt.Printf("ZeroPad(4, 16): \"%s\"\n", ZeroPad(4, 16))
-	fmt.Printf("FileCount(): %d\n", FileCount(*src_dir, IsAudioFile))
-	cnt := 1
-	TraverseFlatDst(*src_dir, *dst_dir, &cnt, 3)
+	BuildAlbum(strings.TrimRight(*src_dir, "/\\"), strings.TrimRight(*dst_dir, "/\\"))
 }
