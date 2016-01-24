@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pebbe/zmq4"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -29,6 +30,9 @@ var (
 	album_tag    = kingpin.Flag("album-tag", "\"Album\" tag").Short('g').String()
 	src_dir      = kingpin.Arg("src", "Source directory").Required().String()
 	dst_dir      = kingpin.Arg("dst", "Destination directory").Required().String()
+
+	context, _   = zmq4.NewContext()
+	requester, _ = context.NewSocket(zmq4.REQ)
 )
 
 // Parses the command line and checks some conditions
@@ -353,9 +357,49 @@ func TraverseTreeDst(srcDir, dstRoot, dstStep string, fcount *int, tot int) {
 	}
 }
 
-// Copy and process one audio file
+// Copy one audio file to destination and set its tags
 func CopyFile(i, tot int, src, dst string) {
+
 	CopySync(src, dst)
+
+	buildTitle := func(s string) string {
+		title := fmt.Sprintf("%d %s", i, s)
+		if *file_title {
+			title = SansExt(BaseName(dst))
+		}
+		return title
+	}
+	buildTag := func(tag, value string) string {
+		return fmt.Sprintf(",\"%s\":\"%s\"", tag, value)
+	}
+
+	rqs := fmt.Sprintf("{\"request\":\"settags\",\"file\":\"%s\",\"tags\":{\"tracknumber\":\"%d/%d\"", dst, i, tot)
+
+	if len(*artist_tag) > 0 && len(*album_tag) > 0 {
+		rqs += buildTag("title", buildTitle(MakeInitials(*artist_tag))+" - "+*album_tag)
+		rqs += buildTag("artist", *artist_tag)
+		rqs += buildTag("album", *album_tag)
+	} else if len(*artist_tag) > 0 {
+		rqs += buildTag("title", buildTitle(*artist_tag))
+		rqs += buildTag("artist", *artist_tag)
+	} else if len(*album_tag) > 0 {
+		rqs += buildTag("title", buildTitle(*album_tag))
+		rqs += buildTag("album", *album_tag)
+	}
+
+	rqs += "}}"
+
+	_, serr := requester.Send(rqs, 0)
+	if serr != nil {
+		fmt.Printf("Request error\n")
+		os.Exit(2)
+	}
+	_, rerr := requester.Recv(0)
+	if rerr != nil {
+		fmt.Printf("Reply error\n")
+		os.Exit(2)
+	}
+
 	if *verbose {
 		fmt.Printf("%5d/%d %s\n", i, tot, dst)
 	} else {
@@ -391,6 +435,13 @@ func CopySync(src, dst string) (int64, error) {
 // Traverses the source tree according to options
 func Groom(src, dst string, tot int) {
 
+	err := requester.Connect("tcp://localhost:64107")
+	defer requester.Close()
+	if err != nil {
+		fmt.Printf("Connection failed.\n")
+		os.Exit(2)
+	}
+
 	if !*verbose {
 		fmt.Printf("Starting ")
 	}
@@ -418,6 +469,8 @@ func Groom(src, dst string, tot int) {
 	}
 }
 
+// Sets up boilerplate required by the options
+// and actually runs the copying
 func BuildAlbum(src, dst string) {
 	srcName := BaseName(src)
 	prefix := ""
