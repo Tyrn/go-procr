@@ -374,19 +374,26 @@ func CopyFile(i, tot int, src, dst string) {
 		value = strings.Replace(value, "\"", "\\\"", -1)
 		return fmt.Sprintf(",\"%s\":\"%s\"", tag, value)
 	}
+	albumTag := func() string {
+		// Just a patch/kludge to keep album_tag 'immutable'
+		if len(*unified_name) > 0 && len(*album_tag) < 1 {
+			return *unified_name
+		}
+		return *album_tag
+	}
 
 	rqs := fmt.Sprintf("{\"request\":\"settags\",\"file\":\"%s\",\"tags\":{\"tracknumber\":\"%d/%d\"", dst, i, tot)
 
-	if len(*artist_tag) > 0 && len(*album_tag) > 0 {
-		rqs += buildTag("title", buildTitle(MakeInitials(*artist_tag))+" - "+*album_tag)
+	if len(*artist_tag) > 0 && len(albumTag()) > 0 {
+		rqs += buildTag("title", buildTitle(MakeInitials(*artist_tag))+" - "+albumTag())
 		rqs += buildTag("artist", *artist_tag)
-		rqs += buildTag("album", *album_tag)
+		rqs += buildTag("album", albumTag())
 	} else if len(*artist_tag) > 0 {
 		rqs += buildTag("title", buildTitle(*artist_tag))
 		rqs += buildTag("artist", *artist_tag)
-	} else if len(*album_tag) > 0 {
-		rqs += buildTag("title", buildTitle(*album_tag))
-		rqs += buildTag("album", *album_tag)
+	} else if len(albumTag()) > 0 {
+		rqs += buildTag("title", buildTitle(albumTag()))
+		rqs += buildTag("album", albumTag())
 	}
 
 	rqs += "}}"
