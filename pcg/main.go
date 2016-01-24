@@ -526,6 +526,11 @@ func BuildAlbum(src, dst string) {
 }
 
 func main() {
+
 	ParseArgs()
-	BuildAlbum(strings.TrimRight(*src_dir, "/\\"), strings.TrimRight(*dst_dir, "/\\"))
+
+	src, _ := filepath.Abs(*src_dir)
+	dst, _ := filepath.Abs(*dst_dir)
+
+	BuildAlbum(src, dst)
 }
