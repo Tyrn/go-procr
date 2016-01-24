@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -370,6 +371,7 @@ func CopyFile(i, tot int, src, dst string) {
 		return title
 	}
 	buildTag := func(tag, value string) string {
+		value = strings.Replace(value, "\"", "\\\"", -1)
 		return fmt.Sprintf(",\"%s\":\"%s\"", tag, value)
 	}
 
@@ -391,12 +393,12 @@ func CopyFile(i, tot int, src, dst string) {
 
 	_, serr := requester.Send(rqs, 0)
 	if serr != nil {
-		fmt.Printf("Request error\n")
+		fmt.Printf("Request error: %v\n", serr)
 		os.Exit(2)
 	}
 	_, rerr := requester.Recv(0)
 	if rerr != nil {
-		fmt.Printf("Reply error\n")
+		fmt.Printf("Reply error: %v\n", rerr)
 		os.Exit(2)
 	}
 
@@ -432,13 +434,24 @@ func CopySync(src, dst string) (int64, error) {
 	return io.Copy(dst_file, src_file)
 }
 
+// Start the Python Mutagen tag server, if it isn't already running
+func StartServer() {
+	cmd := exec.Command("procrserver")
+	startErr := cmd.Start()
+	if startErr != nil {
+		fmt.Printf("Start server error: %v\n", startErr)
+	}
+}
+
 // Traverses the source tree according to options
 func Groom(src, dst string, tot int) {
 
-	err := requester.Connect("tcp://localhost:64107")
+	StartServer() // Start Python Mutagen tag server.
+
+	reqErr := requester.Connect("tcp://localhost:64107")
 	defer requester.Close()
-	if err != nil {
-		fmt.Printf("Connection failed.\n")
+	if reqErr != nil {
+		fmt.Printf("Connection failed: %v\n", reqErr)
 		os.Exit(2)
 	}
 
