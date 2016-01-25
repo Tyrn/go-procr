@@ -380,20 +380,20 @@ func CopyFile(i, tot int, src, dst string) {
 			return *unified_name
 		}
 		return *album_tag
-	}
+	}()
 
 	rqs := fmt.Sprintf("{\"request\":\"settags\",\"file\":\"%s\",\"tags\":{\"tracknumber\":\"%d/%d\"", dst, i, tot)
 
-	if len(*artist_tag) > 0 && len(albumTag()) > 0 {
-		rqs += buildTag("title", buildTitle(MakeInitials(*artist_tag))+" - "+albumTag())
+	if len(*artist_tag) > 0 && len(albumTag) > 0 {
+		rqs += buildTag("title", buildTitle(MakeInitials(*artist_tag))+" - "+albumTag)
 		rqs += buildTag("artist", *artist_tag)
-		rqs += buildTag("album", albumTag())
+		rqs += buildTag("album", albumTag)
 	} else if len(*artist_tag) > 0 {
 		rqs += buildTag("title", buildTitle(*artist_tag))
 		rqs += buildTag("artist", *artist_tag)
-	} else if len(albumTag()) > 0 {
-		rqs += buildTag("title", buildTitle(albumTag()))
-		rqs += buildTag("album", albumTag())
+	} else if len(albumTag) > 0 {
+		rqs += buildTag("title", buildTitle(albumTag))
+		rqs += buildTag("album", albumTag)
 	}
 
 	rqs += "}}"
